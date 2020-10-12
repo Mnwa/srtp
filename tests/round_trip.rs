@@ -2,7 +2,8 @@
 use bytes::{BytesMut, BufMut};
 
 use srtp::{Srtp, CryptoPolicy, SsrcType};
-use smallvec::SmallVec;
+use bumpalo::collections::Vec;
+use bumpalo::Bump;
 
 #[derive(Debug, Clone, Copy)]
 struct Header {
@@ -19,7 +20,7 @@ const HEADER_SIZE: usize = 12;
 const MAX_TRAILER_SIZE: usize = 144;
 
 impl Header {
-    fn to_bytes(&self, payload_size: usize) -> SmallVec<[u8; 2048]> {
+    fn to_bytes<'a>(&self, payload_size: usize, allocator: &'a Bump) -> Vec<'a, u8> {
         let mut bytes = BytesMut::with_capacity(HEADER_SIZE + payload_size + MAX_TRAILER_SIZE);
 
         let mut b1 = 0b10000000u8;
@@ -39,12 +40,13 @@ impl Header {
             bytes.put_u8(0xAB);
         }
 
-        SmallVec::from_slice(&bytes)
+        Vec::from_iter_in(bytes, &allocator)
     }
 }
 
 fn round_trip(policy: CryptoPolicy) {
-    let key: Vec<_> = (0u8..50).collect();
+    let allocator = Bump::new();
+    let key= Vec::from_iter_in(0u8..50, &allocator);
 
     let mut inbound = Srtp::new(SsrcType::AnyInbound, policy, policy, &key).unwrap();
     let mut outbound = Srtp::new(SsrcType::AnyOutbound, policy, policy, &key).unwrap();
@@ -58,7 +60,7 @@ fn round_trip(policy: CryptoPolicy) {
             sequence,
             timestamp: 0xDECAFBAD + (sequence as u32 / 10) * 3000,
             ssrc: 0xDEADBEEF,
-        }.to_bytes(1000);
+        }.to_bytes(1000, &allocator);
         let mut output = input.clone();
 
         outbound.protect(&mut output).unwrap();
