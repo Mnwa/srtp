@@ -2,7 +2,6 @@
 use bytes::{BytesMut, BufMut};
 
 use srtp::{Srtp, CryptoPolicy, SsrcType};
-use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy)]
 struct Header {
@@ -19,7 +18,7 @@ const HEADER_SIZE: usize = 12;
 const MAX_TRAILER_SIZE: usize = 144;
 
 impl Header {
-    fn to_bytes(&self, payload_size: usize) -> SmallVec<[u8; 2048]> {
+    fn to_bytes(&self, payload_size: usize) -> Vec<u8> {
         let mut bytes = BytesMut::with_capacity(HEADER_SIZE + payload_size + MAX_TRAILER_SIZE);
 
         let mut b1 = 0b10000000u8;
@@ -39,7 +38,7 @@ impl Header {
             bytes.put_u8(0xAB);
         }
 
-        SmallVec::from_slice(&bytes)
+        Vec::from(bytes.as_ref())
     }
 }
 
